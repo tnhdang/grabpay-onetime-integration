@@ -4,6 +4,7 @@ const CryptoJS = require('crypto-js');
 const querystring = require('querystring');
 const session = require('express-session');
 const MemoryStore = require('memorystore')(session);
+const moment = require('moment');
 
 const GRAB_PAY_BASE_URL = process.env.GRAB_PAY_BASE_URL;
 const GRAB_PAY_PARTNER_ID = process.env.GRAB_PAY_PARTNER_ID;
@@ -98,7 +99,9 @@ app.get('/grabpay/callback', (req, res) => {
     })
     .then(result => result.json())
     .then(json => {
+      console.log(json);
       let popSignature = generateHMACForPop(json.access_token);
+      console.log(`POP Signature: ${popSignature}`);
       let payload = {
         'partnerTxID': req.session.orderID
       };
@@ -121,7 +124,7 @@ app.get('/grabpay/callback', (req, res) => {
 app.listen(port, () => console.log(`server listening on port ${port}!`));
 
 function generateHMACForPop(accessToken) {     
-  let currentTimestamp = new Date().getTime();
+  let currentTimestamp = moment().unix();
   let messageToHash = `${currentTimestamp}${accessToken}`;
   let signature = CryptoJS.enc.Base64.stringify(
     CryptoJS.HmacSHA256(messageToHash, GRAB_PAY_CLIENT_SECRET));
@@ -129,8 +132,9 @@ function generateHMACForPop(accessToken) {
     'time_since_epoch': currentTimestamp,
     'sig': signature
   };
+	console.log(payload);
 
-  return CryptoJS.enc.Base64.stringify(JSON.stringify(payload));
+  return Buffer.from(JSON.stringify(payload)).toString('base64');
 }
 
 function generateHMACSignature(httpMethod, contentType, requestPath, date, requestBody) {
@@ -146,7 +150,7 @@ ${hashedPayload}
 }
 
 function getAuthorizeQueryString(request, codeVerifier) { 
-  let codeChallenge = CryptoJS.enc.Base64.stringify(CryptoJS.SHA256(codeVerifier)); 
+  let codeChallenge = base64URLEncode(CryptoJS.SHA256(codeVerifier)); 
   let params = { 
     client_id : GRAB_PAY_CLIENT_ID, 
     scope: ['openid', 'payment.one_time_charge'].join(' '), 
